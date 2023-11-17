@@ -20,7 +20,7 @@ module.exports = async function (env, argv) {
   // proxy api requests
   config.devServer.proxy = {
     "/api/shopping_list": {
-      target: `https://${process.env.EXPO_PUBLIC_API_URL}/`,
+      target: `https://${process.env.EXPO_PUBLIC_API_HOST}/`,
       changeOrigin: true,
       secure: true,
     },
