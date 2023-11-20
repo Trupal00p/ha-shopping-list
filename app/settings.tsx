@@ -39,7 +39,11 @@ export default function Details() {
       SecureStore.setItemAsync("HOST", host),
     ]).finally(() => {
       setLoading(false);
-      router.back();
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace("/");
+      }
     });
   };
 

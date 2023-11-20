@@ -3,12 +3,13 @@ import { Link, Stack } from "expo-router";
 import ky from "ky";
 import { AppRegistry, StyleSheet, View } from "react-native";
 import { ScrollView } from "react-native-gesture-handler";
-import { Icon, List, useTheme } from "react-native-paper";
+import { Icon, List, Snackbar, useTheme } from "react-native-paper";
 import { useApi } from "../api";
 import { AddItemInput } from "../components/AddItemInput";
 import { ClearCompletedButton } from "../components/ClearCompletedButton";
 import { useReactQuerySubscription } from "../components/useReactQuerySubscription";
-import { ShoppingItem, ShoppingList } from "../state/types";
+import { ShoppingItem, ShoppingList } from "../types";
+import { useState } from "react";
 
 export default function App() {
   // const [page, setPage] = useState("list");
@@ -29,14 +30,20 @@ export default function App() {
 
   useReactQuerySubscription();
 
+  const [snackText, setSnackText] = useState<string | null>(null);
+  const onDismissSnack = () => {
+    setSnackText(null);
+  };
+
   const toggleComplete = useMutation({
-    mutationFn: (item: ShoppingItem) =>
-      ky.post(`api/shopping_list/item/${item.id}`, {
+    mutationFn: (item: ShoppingItem) => {
+      return ky.post(`api/shopping_list/item/${item.id}`, {
         ...requestOptions,
         json: {
           complete: !item.complete,
         },
-      }),
+      });
+    },
     onMutate: async (item: ShoppingItem) => {
       // Cancel any outgoing refetches
       // (so they don't overwrite our optimistic update)
@@ -57,6 +64,7 @@ export default function App() {
       return { previousShoppingList, item };
     },
     onError: (err, newTodo, context) => {
+      setSnackText("Failed To Save");
       queryClient.setQueryData(
         ["shopping_list"],
         context?.previousShoppingList
@@ -120,7 +128,11 @@ export default function App() {
         </List.Section>
         <List.Section>
           <List.Subheader>
-            Completed <ClearCompletedButton requestOptions={requestOptions} />
+            Completed{" "}
+            <ClearCompletedButton
+              requestOptions={requestOptions || {}}
+              setSnackText={setSnackText}
+            />
           </List.Subheader>
           {completed?.map((item: ShoppingItem) => (
             <List.Item
@@ -145,7 +157,17 @@ export default function App() {
         </List.Section>
         <View style={{ height: 200 }} />
       </ScrollView>
-      <AddItemInput requestOptions={requestOptions} />
+      <AddItemInput
+        requestOptions={requestOptions || {}}
+        setSnackText={setSnackText}
+      />
+      <Snackbar
+        visible={!!snackText}
+        onDismiss={onDismissSnack}
+        duration={2000}
+      >
+        {snackText}
+      </Snackbar>
     </View>
   );
 }

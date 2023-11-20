@@ -1,12 +1,14 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTheme, IconButton } from "react-native-paper";
-import { ShoppingList } from "../state/types";
+import { ShoppingList } from "../types";
 import ky, { Options } from "ky";
 
 export function ClearCompletedButton({
   requestOptions,
+  setSnackText,
 }: {
   requestOptions: Options;
+  setSnackText: (x: string) => void;
 }) {
   const theme = useTheme();
   const queryClient = useQueryClient();
@@ -32,6 +34,7 @@ export function ClearCompletedButton({
       return { previousShoppingList };
     },
     onError: (err, newTodo, context) => {
+      setSnackText("Failed To Save");
       queryClient.setQueryData(
         ["shopping_list"],
         context?.previousShoppingList

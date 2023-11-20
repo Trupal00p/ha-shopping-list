@@ -1,3 +1,4 @@
+import { router } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import { Options } from "ky/distribution/types/options";
 import { useEffect, useState } from "react";
@@ -11,17 +12,22 @@ export const useApi = () => {
     Promise.all([
       SecureStore.getItemAsync("API_KEY"),
       SecureStore.getItemAsync("HOST"),
-    ]).then(([apiKey, host]) => {
-      if (apiKey && host) {
-        setRequestOptions({
-          prefixUrl: `https://${host}`,
-          headers: {
-            authorization: `Bearer ${apiKey}`,
-          },
-        });
-      }
-      setLoading(false);
-    });
+    ])
+      .then(([apiKey, host]) => {
+        if (apiKey && host) {
+          setRequestOptions({
+            prefixUrl: `https://${host}`,
+            headers: {
+              authorization: `Bearer ${apiKey}`,
+            },
+          });
+        } else {
+          router.replace("/settings");
+        }
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }, [setLoading, setRequestOptions]);
 
   return { requestOptions, loading };

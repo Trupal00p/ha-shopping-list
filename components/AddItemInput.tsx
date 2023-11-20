@@ -1,10 +1,16 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Card, TextInput } from "react-native-paper";
-import { ShoppingList } from "../state/types";
+import { ShoppingList } from "../types";
 import ky, { Options } from "ky";
 
-export function AddItemInput({ requestOptions }: { requestOptions: Options }) {
+export function AddItemInput({
+  requestOptions,
+  setSnackText,
+}: {
+  requestOptions: Options;
+  setSnackText: (x: string) => void;
+}) {
   const queryClient = useQueryClient();
   const [newName, setNewName] = useState("");
   const addNew = useMutation({
@@ -37,6 +43,7 @@ export function AddItemInput({ requestOptions }: { requestOptions: Options }) {
       return { previousShoppingList, name };
     },
     onError: (err, newTodo, context) => {
+      setSnackText("Failed To Save");
       queryClient.setQueryData(
         ["shopping_list"],
         context?.previousShoppingList

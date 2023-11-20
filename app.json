@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "scheme":"list",
+    "scheme": "list",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
@@ -16,21 +16,30 @@
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.anonymous.hashopping3"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.anonymous.hashopping3"
     },
     "web": {
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
-
     },
     "plugins": [
       "expo-router"
-    ]
+    ],
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "ef38eddc-fe05-4826-adfd-7b8d661da2e7"
+      }
+    }
   }
 }
