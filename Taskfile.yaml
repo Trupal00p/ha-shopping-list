@@ -1,0 +1,13 @@
+version: '3'
+
+
+
+tasks:
+  proxy:
+    dotenv: ['.env.local']
+    cmds:
+      - node_modules/.bin/nodemon dev-api-proxy.js
+
+  apk:
+    cmds:
+      - eas build --platform android --local --profile preview --output ha-shopping.apk

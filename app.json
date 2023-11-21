@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "hashopping3",
+    "name": "HA Shopping List",
     "slug": "hashopping3",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -17,14 +17,14 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.hashopping3"
+      "bundleIdentifier": "com.trupal00p.ha_shopping_list"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.anonymous.hashopping3"
+      "package": "com.trupal00p.ha_shopping_list"
     },
     "web": {
       "favicon": "./assets/favicon.png",

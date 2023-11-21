@@ -1,8 +1,8 @@
 import { Stack, router } from "expo-router";
-import * as SecureStore from "expo-secure-store";
 import { useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { FAB, TextInput, useTheme } from "react-native-paper";
+import { useSettings } from "../api";
 
 const styles = StyleSheet.create({
   fab: {
@@ -15,29 +15,24 @@ const styles = StyleSheet.create({
 
 export default function Details() {
   const theme = useTheme();
+  const [settings, saveSettings] = useSettings();
+
   const [apiKey, setApiKey] = useState("");
   const [host, setHost] = useState("");
-  const [loading, setLoading] = useState(true);
 
-  // load values
   useEffect(() => {
-    Promise.all([
-      SecureStore.getItemAsync("API_KEY"),
-      SecureStore.getItemAsync("HOST"),
-    ]).then(([apiKey, host]) => {
-      setApiKey(apiKey || "");
-      setHost(host || "");
-      setLoading(false);
-    });
-  }, [setLoading, setApiKey, setHost]);
+    if (settings.apiKey && settings.host) {
+      setApiKey(settings.apiKey);
+      setHost(settings.host);
+    }
+  }, [settings, setApiKey, setHost]);
+
+  const [loading, setLoading] = useState(true);
 
   // save values
   const save = () => {
     setLoading(true);
-    Promise.all([
-      SecureStore.setItemAsync("API_KEY", apiKey),
-      SecureStore.setItemAsync("HOST", host),
-    ]).finally(() => {
+    saveSettings(apiKey, host).finally(() => {
       setLoading(false);
       if (router.canGoBack()) {
         router.back();

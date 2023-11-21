@@ -1,26 +1,31 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, Stack } from "expo-router";
 import ky from "ky";
+import { useState } from "react";
 import { AppRegistry, StyleSheet, View } from "react-native";
 import { ScrollView } from "react-native-gesture-handler";
 import { Icon, List, Snackbar, useTheme } from "react-native-paper";
-import { useApi } from "../api";
+import { useSettings } from "../api";
 import { AddItemInput } from "../components/AddItemInput";
 import { ClearCompletedButton } from "../components/ClearCompletedButton";
 import { useReactQuerySubscription } from "../components/useReactQuerySubscription";
 import { ShoppingItem, ShoppingList } from "../types";
-import { useState } from "react";
 
 export default function App() {
-  // const [page, setPage] = useState("list");
   const queryClient = useQueryClient();
   const theme = useTheme();
+  const [{ apiKey, host }] = useSettings();
 
-  const { requestOptions, loading } = useApi();
+  const requestOptions = {
+    prefixUrl: `http://${host}`,
+    headers: {
+      authorization: `Bearer ${apiKey}`,
+    },
+  };
 
   const query = useQuery({
     queryKey: ["shopping_list"],
-    enabled: !!requestOptions && !loading,
+    enabled: !!apiKey && !!host,
     queryFn: async () => {
       const result =
         (await ky.get("api/shopping_list", requestOptions).json()) || [];
@@ -28,7 +33,9 @@ export default function App() {
     },
   });
 
-  useReactQuerySubscription();
+  console.log(host)
+
+  useReactQuerySubscription(apiKey, host);
 
   const [snackText, setSnackText] = useState<string | null>(null);
   const onDismissSnack = () => {

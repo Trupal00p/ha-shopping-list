@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import { PaperProvider, useTheme } from "react-native-paper";
+import { SettingsProvider } from "../api";
 
 const queryClient = new QueryClient();
 
@@ -20,8 +21,10 @@ const ConfiguredStack = () => {
 export default function Layout() {
   return (
     <QueryClientProvider client={queryClient}>
-      <PaperProvider theme={{dark:false}}>
-        <ConfiguredStack />
+      <PaperProvider theme={{ dark: false }}>
+        <SettingsProvider>
+          <ConfiguredStack />
+        </SettingsProvider>
       </PaperProvider>
     </QueryClientProvider>
   );
