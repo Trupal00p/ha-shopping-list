@@ -1,46 +1,68 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, Stack } from "expo-router";
 import ky from "ky";
-import { useState } from "react";
-import { AppRegistry, StyleSheet, View } from "react-native";
+import { ErrorBoundary } from "react-error-boundary";
+import { AppRegistry, View } from "react-native";
 import { ScrollView } from "react-native-gesture-handler";
-import { Icon, List, Snackbar, useTheme } from "react-native-paper";
-import { useSettings } from "../api";
+import { Icon, List, Text, useTheme } from "react-native-paper";
 import { AddItemInput } from "../components/AddItemInput";
 import { ClearCompletedButton } from "../components/ClearCompletedButton";
+import { useSettings } from "../components/SettingContext";
+import { useSnack } from "../components/SnackContext";
 import { useReactQuerySubscription } from "../components/useReactQuerySubscription";
 import { ShoppingItem, ShoppingList } from "../types";
 
-export default function App() {
+export default function Wrapper() {
+  const theme = useTheme();
+  return (
+    <View style={{ backgroundColor: theme.colors.background, height: "100%" }}>
+      <Stack.Screen
+        options={{
+          headerTitle: "Shopping List",
+          // headerLeft: () => (
+          //   <Icon source="cart" size={22} color={theme.colors.primary} />
+          // ),
+          headerRight: () => (
+            <View>
+              <Link href={{ pathname: "settings" }}>
+                <Icon source="cog" size={30} color={theme.colors.primary} />
+              </Link>
+            </View>
+          ),
+        }}
+      />
+      <ErrorBoundary fallback={<Text>Something went wrong</Text>}>
+        <Page />
+      </ErrorBoundary>
+    </View>
+  );
+}
+function Page() {
   const queryClient = useQueryClient();
   const theme = useTheme();
   const [{ apiKey, host }] = useSettings();
+  const setSnackText = useSnack();
 
   const requestOptions = {
-    prefixUrl: `http://${host}`,
+    prefixUrl: `${
+      process.env.NODE_ENV === "development" ? "https" : "https"
+    }://${host}/`,
+    retry: 1,
     headers: {
       authorization: `Bearer ${apiKey}`,
     },
   };
 
-  const query = useQuery({
-    queryKey: ["shopping_list"],
+  const { isLoading, isError, data, error } = useQuery({
+    queryKey: ["shopping_list", host, apiKey],
     enabled: !!apiKey && !!host,
+    retry: false,
     queryFn: async () => {
-      const result =
-        (await ky.get("api/shopping_list", requestOptions).json()) || [];
-      return result;
+      return (await ky.get("api/shopping_list", requestOptions).json()) || [];
     },
   });
 
-  console.log(host)
-
   useReactQuerySubscription(apiKey, host);
-
-  const [snackText, setSnackText] = useState<string | null>(null);
-  const onDismissSnack = () => {
-    setSnackText(null);
-  };
 
   const toggleComplete = useMutation({
     mutationFn: (item: ShoppingItem) => {
@@ -80,7 +102,7 @@ export default function App() {
   });
 
   const { completed, todo } =
-    query.data?.reduce(
+    data?.reduce(
       (acc, item) => {
         if (item.complete) {
           acc.completed.push(item);
@@ -92,23 +114,12 @@ export default function App() {
       { completed: [], todo: [] }
     ) || {};
 
-  return (
-    <View style={{ backgroundColor: theme.colors.background, height: "100%" }}>
-      <Stack.Screen
-        options={{
-          headerTitle: "Shopping List",
-          // headerLeft: () => (
-          //   <Icon source="cart" size={22} color={theme.colors.primary} />
-          // ),
-          headerRight: () => (
-            <View>
-              <Link href={{ pathname: "settings" }}>
-                <Icon source="cog" size={30} color={theme.colors.primary} />
-              </Link>
-            </View>
-          ),
-        }}
-      />
+  return isLoading ? (
+    <Text>Loading</Text>
+  ) : isError ? (
+    <Text>{error.message}</Text>
+  ) : (
+    <>
       <ScrollView style={{ height: "100%" }}>
         <List.Section>
           {/* <List.Subheader>Items</List.Subheader> */}
@@ -135,7 +146,6 @@ export default function App() {
         </List.Section>
         <List.Section>
           <List.Subheader>
-            Completed{" "}
             <ClearCompletedButton
               requestOptions={requestOptions || {}}
               setSnackText={setSnackText}
@@ -168,34 +178,8 @@ export default function App() {
         requestOptions={requestOptions || {}}
         setSnackText={setSnackText}
       />
-      <Snackbar
-        visible={!!snackText}
-        onDismiss={onDismissSnack}
-        duration={2000}
-      >
-        {snackText}
-      </Snackbar>
-    </View>
+    </>
   );
 }
 
-AppRegistry.registerComponent("Home Assitant Shopping", () => App);
-// {/* //     <SafeAreaProvider>
-// //       <SafeAreaView style={styles.container}>
-// // <List setPage={setPage} api={api} />
-// // page === "list" ? (
-// // ) : page === "settings" ? (
-// //   <Settings setPage={setPage} state={state} actions={actions} />
-// // ) : null
-// //       </SafeAreaView>
-// //     </SafeAreaProvider> */}
-
-const styles = StyleSheet.create({
-  container: {
-    // flex: 1,
-    height: "100%",
-    backgroundColor: "#fff",
-    // alignItems: "center",
-    // justifyContent: "center",
-  },
-});
+AppRegistry.registerComponent("Home Assistant Shopping List", () => App);

@@ -1,8 +1,10 @@
+// import "expo-dev-client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
-import { PaperProvider, useTheme } from "react-native-paper";
-import { SettingsProvider } from "../api";
-
+import { PaperProvider, Text, useTheme } from "react-native-paper";
+import { SettingsProvider } from "../components/SettingContext";
+import { SnackProvider } from "../components/SnackContext";
+import { ErrorBoundary } from "react-error-boundary";
 const queryClient = new QueryClient();
 
 const ConfiguredStack = () => {
@@ -23,7 +25,9 @@ export default function Layout() {
     <QueryClientProvider client={queryClient}>
       <PaperProvider theme={{ dark: false }}>
         <SettingsProvider>
-          <ConfiguredStack />
+          <SnackProvider>
+            <ConfiguredStack />
+          </SnackProvider>
         </SettingsProvider>
       </PaperProvider>
     </QueryClientProvider>

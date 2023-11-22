@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useTheme, IconButton } from "react-native-paper";
+import { useTheme, IconButton, Button } from "react-native-paper";
 import { ShoppingList } from "../types";
 import ky, { Options } from "ky";
 
@@ -42,12 +42,12 @@ export function ClearCompletedButton({
     },
   });
   return (
-    <IconButton
+    <Button
       icon="notification-clear-all"
-      iconColor={theme.colors.primary}
-      size={20}
-      // style={{ position: "absolute", right:5, top:5 }}
+      mode="elevated"
       onPress={() => clearCompleted.mutate()}
-    />
+    >
+      Clear Completed
+    </Button>
   );
 }

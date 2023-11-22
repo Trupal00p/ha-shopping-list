@@ -2,7 +2,7 @@ import { Stack, router } from "expo-router";
 import { useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { FAB, TextInput, useTheme } from "react-native-paper";
-import { useSettings } from "../api";
+import { useSettings } from "../components/SettingContext";
 
 const styles = StyleSheet.create({
   fab: {

@@ -52,19 +52,22 @@ export const SettingsProvider = ({ children }: { children: any }) => {
     host: string
   ): Promise<[void, void]> => {
     setConfig({ apiKey, host });
+    let result: Promise<[void, void]>;
     if (await SecureStore.isAvailableAsync()) {
-      return Promise.all([
+      result = Promise.all([
         SecureStore.setItemAsync("API_KEY", apiKey),
-        SecureStore.setItemAsync("HOST", apiKey),
+        SecureStore.setItemAsync("HOST", host),
       ]);
     } else if (!!window.localStorage) {
-      return Promise.resolve([
+      result = Promise.resolve([
         localStorage.setItem("API_KEY", apiKey),
         localStorage.setItem("HOST", host),
       ]);
     } else {
-      return Promise.resolve([undefined, undefined]);
+      result = Promise.resolve([undefined, undefined]);
     }
+
+    return result;
   };
 
   return (
@@ -73,30 +76,3 @@ export const SettingsProvider = ({ children }: { children: any }) => {
     </SettingsContext.Provider>
   );
 };
-
-// export const useApi = () => {
-//   const [loading, setLoading] = useState(true);
-//   const [requestOptions, setRequestOptions] = useState<Options | undefined>();
-
-//   // load values
-//   useEffect(() => {
-//     loadSettings()
-//       .then(([apiKey, host]) => {
-//         if (apiKey && host) {
-//           setRequestOptions({
-//             prefixUrl: `http://${host}`,
-//             headers: {
-//               authorization: `Bearer ${apiKey}`,
-//             },
-//           });
-//         } else {
-//           router.replace("/settings");
-//         }
-//       })
-//       .finally(() => {
-//         setLoading(false);
-//       });
-//   }, [setLoading, setRequestOptions]);
-
-//   return { requestOptions, loading };
-// };

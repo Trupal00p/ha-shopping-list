@@ -1,6 +1,7 @@
 version: '3'
 
-
+env:
+  ADB_SERVER_SOCKET: tcp:$(cat /etc/resolv.conf | awk '/nameserver/ {print $2}'):5037
 
 tasks:
   proxy:
@@ -11,3 +12,15 @@ tasks:
   apk:
     cmds:
       - eas build --platform android --local --profile preview --output ha-shopping.apk
+  
+  devbuild:
+    cmds:
+      - eas build --platform android --local --profile development --output ha-shopping.apk
+  
+  install:
+    cmds:
+      - adb install ha-shopping.apk
+
+  devices:
+    cmds:
+    - adb devices
