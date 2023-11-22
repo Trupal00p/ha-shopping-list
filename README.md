@@ -48,6 +48,7 @@ Thanks of course to the awesome Home Assistant project for helping me program my
 ### To-do
 
 - [ ] Better Loading/Error Screens
+- [ ] iOS Build Configuration (PRs welcome)
 
 ### License
 
