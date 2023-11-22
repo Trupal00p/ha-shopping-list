@@ -1,5 +1,6 @@
 import { router } from "expo-router";
 import * as SecureStore from "expo-secure-store";
+import { Options } from "ky";
 import { createContext, useContext, useEffect, useState } from "react";
 
 export const loadSettings = async () => {
@@ -17,15 +18,17 @@ export const loadSettings = async () => {
 
 type SettingsState = { apiKey?: string; host?: string };
 
-type SettingsContext = [
-  SettingsState,
-  (apiKey: string, host: string) => Promise<[void, void]>,
-];
+type SettingsContext = {
+  settings: SettingsState;
+  saveSettings: (apiKey: string, host: string) => Promise<[void, void]>;
+  requestOptions: Options;
+};
 
-const SettingsContext = createContext<SettingsContext>([
-  {},
-  () => Promise.resolve([undefined, undefined]),
-]);
+const SettingsContext = createContext<SettingsContext>({
+  settings: {},
+  saveSettings: () => Promise.resolve([undefined, undefined]),
+  requestOptions: {},
+});
 
 export const useSettings = () => {
   return useContext(SettingsContext);
@@ -70,8 +73,20 @@ export const SettingsProvider = ({ children }: { children: any }) => {
     return result;
   };
 
+  const requestOptions = {
+    prefixUrl: `${
+      process.env.NODE_ENV === "development" ? "https" : "https"
+    }://${settings.host}/`,
+    retry: 1,
+    headers: {
+      authorization: `Bearer ${settings.apiKey}`,
+    },
+  };
+
   return (
-    <SettingsContext.Provider value={[settings, saveSettings]}>
+    <SettingsContext.Provider
+      value={{ settings, saveSettings, requestOptions }}
+    >
       {children}
     </SettingsContext.Provider>
   );

@@ -1,21 +1,43 @@
-import { useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
-import { useSnack } from "./SnackContext";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { useSnack } from "../components/SnackContext";
 import isValidHostname from "is-valid-hostname";
+import ky from "ky";
+import { useSettings } from "../components/SettingContext";
 
-export const useReactQuerySubscription = (apiKey?: string, host?: string) => {
+export const useRealtimeList = () => {
   const queryClient = useQueryClient();
   const setSnackText = useSnack();
+
+  const {
+    settings: { apiKey, host },
+    requestOptions,
+  } = useSettings();
+
+  const query = useQuery({
+    queryKey: ["shopping_list", host, apiKey],
+    enabled: !!apiKey && !!host,
+    retry: false,
+    queryFn: async () => {
+      return (await ky.get("api/shopping_list", requestOptions).json()) || [];
+    },
+  });
+
+  const [wsCount, setWsCount] = useState(0);
+  const [effectKey, setEffectKey] = useState(false);
 
   useEffect(() => {
     if (apiKey && host && isValidHostname(host)) {
       try {
         const ws = new WebSocket(`wss://${host}/api/websocket`);
         ws.addEventListener("error", (errorEvent) => {
-          setSnackText("Unable to Connect to Home Assistant WebSocket");
+          setSnackText("Unable to Connect to Home Assistant WebSocket [Error]");
         });
         ws.addEventListener("close", (errorEvent) => {
-          setSnackText("Disconnected Home Assistant WebSocket");
+          setSnackText("Disconnected Home Assistant WebSocket [Closed]");
+        });
+        ws.addEventListener("open", (event) => {
+          setWsCount((c) => c + 1);
         });
 
         const listener = (event: MessageEvent) => {
@@ -64,10 +86,34 @@ export const useReactQuerySubscription = (apiKey?: string, host?: string) => {
 
         return () => {
           ws.close();
+          setWsCount((c) => c - 1);
         };
       } catch (e) {
         console.log("ws error", e);
       }
     }
-  }, [apiKey, host, queryClient]);
+  }, [apiKey, host, queryClient, setWsCount, effectKey]);
+
+  const { completed, todo } =
+    query.data?.reduce(
+      (acc, item) => {
+        if (item.complete) {
+          acc.completed.push(item);
+        } else {
+          acc.todo.push(item);
+        }
+        return acc;
+      },
+      { completed: [], todo: [] }
+    ) || {};
+
+  return {
+    ...query,
+    completed,
+    todo,
+    wsConnected: wsCount > 0,
+    reconnectWs: () => {
+      setEffectKey((c) => !c);
+    },
+  };
 };

@@ -15,7 +15,7 @@ const styles = StyleSheet.create({
 
 export default function Details() {
   const theme = useTheme();
-  const [settings, saveSettings] = useSettings();
+  const { settings, saveSettings } = useSettings();
 
   const [apiKey, setApiKey] = useState("");
   const [host, setHost] = useState("");
