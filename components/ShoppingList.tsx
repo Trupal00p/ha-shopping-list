@@ -1,4 +1,4 @@
-import { View } from "react-native";
+import { RefreshControl, View } from "react-native";
 import { ScrollView } from "react-native-gesture-handler";
 import {
   ActivityIndicator,
@@ -24,9 +24,15 @@ export function ShoppingListView() {
     todo,
     completed,
     refetch,
+    isRefetching
   } = useRealtimeList();
 
   const { addNew, toggle, clearCompleted } = useMutations();
+
+  const onRefresh = () => {
+    refetch();
+    reconnectWs();
+  };
 
   return isLoading ? (
     <View style={{ padding: 30 }}>
@@ -36,7 +42,12 @@ export function ShoppingListView() {
     <Text>{error.message}</Text>
   ) : (
     <>
-      <ScrollView style={{ height: "100%" }}>
+      <ScrollView
+        style={{ height: "100%" }}
+        refreshControl={
+          <RefreshControl refreshing={isRefetching} onRefresh={onRefresh} />
+        }
+      >
         <List.Section>
           {todo?.map((item: ShoppingItem) => (
             <List.Item
@@ -74,16 +85,6 @@ export function ShoppingListView() {
                 onPress={() => clearCompleted.mutate()}
               >
                 Clear Completed
-              </Button>
-              <Button
-                icon="refresh"
-                mode="elevated"
-                onPress={() => {
-                  refetch();
-                  reconnectWs();
-                }}
-              >
-                Refresh Data
               </Button>
             </View>
           </List.Subheader>
