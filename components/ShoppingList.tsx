@@ -24,7 +24,7 @@ export function ShoppingListView() {
     todo,
     completed,
     refetch,
-    isRefetching
+    isRefetching,
   } = useRealtimeList();
 
   const { addNew, toggle, clearCompleted } = useMutations();
@@ -126,10 +126,10 @@ export function ShoppingListView() {
             justifyContent: "center",
           }}
         >
-          {wsConnected ? (
-            <Text>🟢 Real-Time Updates</Text>
-          ) : (
-            <Text>🔴 Real-Time Updates</Text>
+          {wsConnected ? null : (
+            <Text>
+              🔴 Disconnected. Pull down to reconnect.
+            </Text>
           )}
         </View>
         <AddItemInput addMutation={addNew} />
