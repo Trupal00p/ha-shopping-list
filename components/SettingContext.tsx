@@ -3,7 +3,7 @@ import * as SecureStore from "expo-secure-store";
 import { Options } from "ky";
 import { createContext, useContext, useEffect, useState } from "react";
 
-export const loadSettings = async () => {
+const loadSettings = async () => {
   if (await SecureStore.isAvailableAsync()) {
     return Promise.all([
       SecureStore.getItemAsync("API_KEY"),
@@ -54,6 +54,9 @@ export const SettingsProvider = ({ children }: { children: any }) => {
     apiKey: string,
     host: string
   ): Promise<[void, void]> => {
+    apiKey = apiKey.trim();
+    host = host.trim();
+
     setConfig({ apiKey, host });
     let result: Promise<[void, void]>;
     if (await SecureStore.isAvailableAsync()) {
