@@ -1,0 +1,89 @@
+name: Build and Release APK
+
+on:
+  release:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Tag name for the release'
+        required: true
+
+jobs:
+  build:
+    name: Build APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
+
+      - name: Setup Expo and EAS
+        uses: expo/expo-github-action@v8
+        with:
+          expo-version: latest
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Android APK
+        id: build
+        run: |
+          # Start the build (this will wait for completion by default)
+          eas build --platform android --profile preview --non-interactive
+
+      - name: Get latest build info
+        id: get_build
+        run: |
+          # Get the most recent completed build
+          BUILD_INFO=$(eas build:list --platform android --limit 1 --json)
+          ARTIFACT_URL=$(echo $BUILD_INFO | jq -r '.[0].artifacts.buildUrl')
+
+          if [ -z "$ARTIFACT_URL" ] || [ "$ARTIFACT_URL" = "null" ]; then
+            echo "Failed to get artifact URL"
+            echo $BUILD_INFO | jq
+            exit 1
+          fi
+
+          echo "Artifact URL: $ARTIFACT_URL"
+          echo "artifact_url=$ARTIFACT_URL" >> $GITHUB_OUTPUT
+
+      - name: Download APK
+        run: |
+          curl -L -o app-release.apk "${{ steps.get_build.outputs.artifact_url }}"
+
+      - name: Get release
+        id: get_release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            let release;
+            if (context.payload.release) {
+              release = context.payload.release;
+            } else {
+              const tag = context.payload.inputs.tag_name;
+              const { data } = await github.rest.repos.getReleaseByTag({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tag: tag
+              });
+              release = data;
+            }
+            return release.upload_url;
+
+      - name: Upload APK to release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.get_release.outputs.result }}
+          asset_path: ./app-release.apk
+          asset_name: ha-shopping-list-${{ github.ref_name }}.apk
+          asset_content_type: application/vnd.android.package-archive
