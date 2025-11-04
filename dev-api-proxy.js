@@ -1,3 +1,4 @@
+require("dotenv").config({ path: ".env.local" });
 const express = require("express");
 const cors = require("cors");
 const { createProxyMiddleware } = require("http-proxy-middleware");
@@ -10,8 +11,9 @@ app.use(
   })
 );
 
+// REST API proxy - proxy all /api/* requests
 app.use(
-  "/api/shopping_list",
+  "/api",
   createProxyMiddleware({
     target: `https://${process.env.EXPO_PUBLIC_API_HOST}/`,
     changeOrigin: true,
@@ -19,16 +21,17 @@ app.use(
   })
 );
 
-// const wsProxy = createProxyMiddleware("/api/websocket", {
-//   target: `wss://${process.env.EXPO_PUBLIC_API_HOST}/api/websocket`,
-//   // pathFilter:'/api/websocket',
-//   changeOrigin: true,
-//   secure:true,
-//   ws: true,
-// });
+// WebSocket proxy
+const wsProxy = createProxyMiddleware("/api/websocket", {
+  target: `https://${process.env.EXPO_PUBLIC_API_HOST}/`,
+  changeOrigin: true,
+  secure: true,
+  ws: true,
+});
 
-// app.use("/api/websocket", wsProxy);
+app.use("/api/websocket", wsProxy);
 
-app.listen(3000);
+const server = app.listen(3000);
 
-// app.on("upgrade", wsProxy.upgrade);
+// Enable WebSocket upgrade
+server.on("upgrade", wsProxy.upgrade);

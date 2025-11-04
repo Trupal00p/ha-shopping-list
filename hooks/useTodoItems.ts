@@ -4,25 +4,53 @@ import { useSnack } from "../components/SnackContext";
 import isValidHostname from "is-valid-hostname";
 import ky from "ky";
 import { useSettings } from "../components/SettingContext";
-import { ShoppingList } from "../types";
+import { TodoList, TodoItem } from "../types";
 
-export const useRealtimeList = () => {
+interface TodoEntityState {
+  entity_id: string;
+  state: string;
+  attributes: {
+    items?: TodoItem[];
+  };
+}
+
+export const useTodoItems = (entityId?: string) => {
   const queryClient = useQueryClient();
   const setSnackText = useSnack();
 
   const { settings, requestOptions } = useSettings();
-
   const { apiKey, host, useTls } = settings;
 
   // Strip port for hostname validation
   const hostWithoutPort = host?.split(":")[0] || "";
 
-  const query = useQuery<ShoppingList>({
-    queryKey: ["shopping_list", useTls, host, apiKey],
-    enabled: !!apiKey && !!host && isValidHostname(hostWithoutPort),
+  const query = useQuery<TodoList>({
+    queryKey: ["todo_items", entityId],
+    enabled: !!apiKey && !!host && !!entityId && isValidHostname(hostWithoutPort),
     retry: false,
     queryFn: async () => {
-      return (await ky.get("api/shopping_list", requestOptions).json()) as ShoppingList;
+      // Call the todo.get_items service to fetch items
+      const response = (await ky
+        .post(`api/services/todo/get_items?return_response=true`, {
+          ...requestOptions,
+          json: {
+            entity_id: entityId,
+          },
+        })
+        .json()) as any;
+
+      // The service returns items in service_response[entity_id].items
+      if (
+        response &&
+        response.service_response &&
+        entityId &&
+        response.service_response[entityId] &&
+        response.service_response[entityId].items
+      ) {
+        return response.service_response[entityId].items;
+      }
+
+      return [];
     },
   });
 
@@ -30,7 +58,7 @@ export const useRealtimeList = () => {
   const [effectKey, setEffectKey] = useState(false);
 
   useEffect(() => {
-    if (apiKey && host && isValidHostname(hostWithoutPort)) {
+    if (apiKey && host && entityId && isValidHostname(hostWithoutPort)) {
       try {
         const ws = new WebSocket(
           `ws${useTls ? "s" : ""}://${host}/api/websocket`
@@ -41,18 +69,10 @@ export const useRealtimeList = () => {
         setWsCount((c) => c + 1);
 
         ws.addEventListener("error", (errorEvent) => {
-          if (isConnected) {
-            setSnackText(
-              "Unable to Connect to Home Assistant WebSocket [Error]"
-            );
-          }
           setWsCount((c) => c - 1);
         });
 
         ws.addEventListener("close", (errorEvent) => {
-          if (isConnected) {
-            setSnackText("Disconnected Home Assistant WebSocket [Closed]");
-          }
           setWsCount((c) => c - 1);
         });
 
@@ -68,18 +88,18 @@ export const useRealtimeList = () => {
               );
               break;
             case "auth_ok":
-              // logged in/connected
               isConnected = true;
+              // Subscribe to state_changed events for this specific entity
               ws.send(
                 JSON.stringify({
                   type: "subscribe_events",
-                  event_type: "shopping_list_updated",
+                  event_type: "state_changed",
                   id: subscriptionId,
                 })
               );
               // Invalidate on successful connection to ensure sync
               queryClient.invalidateQueries({
-                queryKey: ["shopping_list"],
+                queryKey: ["todo_items", entityId],
               });
               break;
             case "auth_invalid":
@@ -87,18 +107,12 @@ export const useRealtimeList = () => {
               ws.close();
               break;
             case "event":
-              if (message.event.event_type === "shopping_list_updated") {
-                // const update = message.event.data.item;
-                switch (message.event.data.action) {
-                  case "update":
-                  case "add":
-                  case "remove":
-                  case "clear":
-                  case "reorder":
-                    queryClient.invalidateQueries({
-                      queryKey: ["shopping_list"],
-                    });
-                    break;
+              if (message.event.event_type === "state_changed") {
+                // Check if this state change is for our todo entity
+                if (message.event.data.entity_id === entityId) {
+                  queryClient.invalidateQueries({
+                    queryKey: ["todo_items", entityId],
+                  });
                 }
               }
               break;
@@ -116,12 +130,22 @@ export const useRealtimeList = () => {
         // WebSocket connection failed
       }
     }
-  }, [settings, queryClient, setWsCount, effectKey, setSnackText, hostWithoutPort, apiKey, host]);
+  }, [
+    settings,
+    queryClient,
+    setWsCount,
+    effectKey,
+    setSnackText,
+    hostWithoutPort,
+    apiKey,
+    host,
+    entityId,
+  ]);
 
   const { completed, todo } =
     (query.data || []).reduce(
-      (acc: { completed: ShoppingList; todo: ShoppingList }, item) => {
-        if (item.complete) {
+      (acc: { completed: TodoList; todo: TodoList }, item) => {
+        if (item.status === "completed") {
           acc.completed.push(item);
         } else {
           acc.todo.push(item);
