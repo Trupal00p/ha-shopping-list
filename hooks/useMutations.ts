@@ -3,6 +3,7 @@ import ky from "ky";
 import { ShoppingItem, ShoppingList } from "../types";
 import { useSettings } from "../components/SettingContext";
 import { useSnack } from "../components/SnackContext";
+import { onlineManager } from "@tanstack/react-query";
 
 export function useMutations() {
   const { requestOptions } = useSettings();
@@ -18,6 +19,9 @@ export function useMutations() {
         },
       });
     },
+    networkMode: "offlineFirst",
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     onMutate: async (item: ShoppingItem) => {
       // Cancel any outgoing refetches
       // (so they don't overwrite our optimistic update)
@@ -30,25 +34,47 @@ export function useMutations() {
 
       let newShoppingList = [...previousShoppingList];
 
-      newShoppingList[itemIndex] = { ...item, complete: !item.complete };
+      newShoppingList[itemIndex] = {
+        ...item,
+        complete: !item.complete,
+        _pending: true,
+        _timestamp: Date.now(),
+      };
 
       // Optimistically update to the new value
       queryClient.setQueryData(["shopping_list"], newShoppingList);
 
       return { previousShoppingList, item };
     },
-    onError: (err, newTodo, context) => {
-      setSnackText("Failed To Save");
-      queryClient.setQueryData(
-        ["shopping_list"],
-        context?.previousShoppingList
+    onSuccess: (data, item) => {
+      // Clear pending flag after successful sync
+      const currentList: ShoppingList =
+        queryClient.getQueryData(["shopping_list"]) || [];
+      const updated = currentList.map((i) =>
+        i.id === item.id ? { ...i, _pending: false } : i
       );
+      queryClient.setQueryData(["shopping_list"], updated);
+    },
+    onError: (err, item, context) => {
+      const isOnline = onlineManager.isOnline();
+      if (!isOnline) {
+        setSnackText("Saved locally. Will sync when online.");
+      } else {
+        setSnackText("Failed To Save");
+        queryClient.setQueryData(
+          ["shopping_list"],
+          context?.previousShoppingList
+        );
+      }
     },
   });
 
   const clearCompleted = useMutation({
     mutationFn: () =>
       ky.post(`api/shopping_list/clear_completed`, requestOptions),
+    networkMode: "offlineFirst",
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     onMutate: async () => {
       // Cancel any outgoing refetches
       // (so they don't overwrite our optimistic update)
@@ -67,12 +93,21 @@ export function useMutations() {
 
       return { previousShoppingList };
     },
-    onError: (err, newTodo, context) => {
-      setSnackText("Failed To Save");
-      queryClient.setQueryData(
-        ["shopping_list"],
-        context?.previousShoppingList
-      );
+    onSuccess: () => {
+      // Refetch to ensure we're in sync with server
+      queryClient.invalidateQueries({ queryKey: ["shopping_list"] });
+    },
+    onError: (err, variables, context) => {
+      const isOnline = onlineManager.isOnline();
+      if (!isOnline) {
+        setSnackText("Saved locally. Will sync when online.");
+      } else {
+        setSnackText("Failed To Save");
+        queryClient.setQueryData(
+          ["shopping_list"],
+          context?.previousShoppingList
+        );
+      }
     },
   });
 
@@ -84,6 +119,9 @@ export function useMutations() {
           name,
         },
       }),
+    networkMode: "offlineFirst",
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     onMutate: async (name: string) => {
       // Cancel any outgoing refetches
       // (so they don't overwrite our optimistic update)
@@ -92,25 +130,37 @@ export function useMutations() {
       const previousShoppingList: ShoppingList =
         queryClient.getQueryData(["shopping_list"]) || [];
 
+      const tempId = `temp-${(Math.random() + 1).toString(36).substring(7)}`;
       let newShoppingList = [
         ...previousShoppingList,
         {
           name,
-          completed: false,
-          id: (Math.random() + 1).toString(36).substring(7),
+          complete: false,
+          id: tempId,
+          _pending: true,
+          _timestamp: Date.now(),
         },
       ];
 
       // Optimistically update to the new value
       queryClient.setQueryData(["shopping_list"], newShoppingList);
-      return { previousShoppingList, name };
+      return { previousShoppingList, name, tempId };
     },
-    onError: (err, newTodo, context) => {
-      setSnackText("Failed To Save");
-      queryClient.setQueryData(
-        ["shopping_list"],
-        context?.previousShoppingList
-      );
+    onSuccess: (data, name, context) => {
+      // Replace temp item with real one from server
+      queryClient.invalidateQueries({ queryKey: ["shopping_list"] });
+    },
+    onError: (err, name, context) => {
+      const isOnline = onlineManager.isOnline();
+      if (!isOnline) {
+        setSnackText("Saved locally. Will sync when online.");
+      } else {
+        setSnackText("Failed To Save");
+        queryClient.setQueryData(
+          ["shopping_list"],
+          context?.previousShoppingList
+        );
+      }
     },
   });
 

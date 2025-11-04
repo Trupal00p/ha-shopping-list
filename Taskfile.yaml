@@ -24,3 +24,17 @@ tasks:
   devices:
     cmds:
     - adb devices
+  
+  start_proxy:
+    cmds:
+      - npm run proxy
+    
+  start_dev:
+    cmds:
+      - npm start
+  
+
+  browser:
+    cmds:
+      - task:start_proxy
+      - task:start_dev

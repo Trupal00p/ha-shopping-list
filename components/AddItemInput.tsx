@@ -2,20 +2,11 @@ import { UseMutationResult } from "@tanstack/react-query";
 import { KyResponse } from "ky";
 import { useState } from "react";
 import { Card, TextInput } from "react-native-paper";
-import { ShoppingList } from "../types";
 
 export function AddItemInput({
   addMutation,
 }: {
-  addMutation: UseMutationResult<
-    KyResponse,
-    Error,
-    string,
-    {
-      previousShoppingList: ShoppingList;
-      name: string;
-    }
-  >;
+  addMutation: UseMutationResult<KyResponse, Error, string, any>;
 }) {
   const [newName, setNewName] = useState("");
 

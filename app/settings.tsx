@@ -1,7 +1,7 @@
 import { Stack, router } from "expo-router";
 import { useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
-import { FAB, TextInput, useTheme } from "react-native-paper";
+import { Checkbox, FAB, TextInput, useTheme, Text } from "react-native-paper";
 import { useSettings } from "../components/SettingContext";
 
 const styles = StyleSheet.create({
@@ -19,11 +19,13 @@ export default function Details() {
 
   const [apiKey, setApiKey] = useState("");
   const [host, setHost] = useState("");
+  const [useTls, setUseTls] = useState(false);
 
   useEffect(() => {
     if (settings.apiKey && settings.host) {
       setApiKey(settings.apiKey);
       setHost(settings.host);
+      setUseTls(settings.useTls || false);
     }
   }, [settings, setApiKey, setHost]);
 
@@ -32,7 +34,7 @@ export default function Details() {
   // save values
   const save = () => {
     setLoading(true);
-    saveSettings(apiKey, host).finally(() => {
+    saveSettings({ apiKey, host, useTls }).finally(() => {
       setLoading(false);
       if (router.canGoBack()) {
         router.back();
@@ -62,6 +64,16 @@ export default function Details() {
           value={apiKey}
           onChangeText={(text) => setApiKey(text)}
         />
+        <Text>
+          Use TLS:{" "}
+          <Checkbox
+            status={useTls ? "checked" : "unchecked"}
+            onPress={() => {
+              setUseTls((tls) => !tls);
+            }}
+          />
+        </Text>
+
         <View style={{ height: 200 }} />
         <FAB
           icon="content-save"
