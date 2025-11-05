@@ -17,14 +17,14 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.trupal00p.ha_shopping_list"
+      "bundleIdentifier": "com.trupal00p.hashoppinglist"
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.trupal00p.ha_shopping_list"
+      "package": "com.trupal00p.hashoppinglist"
     },
     "web": {
       "favicon": "./assets/favicon.png",
