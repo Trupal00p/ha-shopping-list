@@ -45,6 +45,8 @@
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
+    "@babel/plugin-transform-private-methods": "^7.27.1",
+    "@babel/plugin-transform-private-property-in-object": "^7.27.1",
     "@expo/webpack-config": "^19.0.0",
     "@tanstack/eslint-plugin-query": "^5.8.3",
     "@types/react": "~18.2.14",
