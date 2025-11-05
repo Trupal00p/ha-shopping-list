@@ -1,55 +1,54 @@
 # Upgrade Notes
 
-## Current SDK Version: Expo SDK 49
+## Current SDK Version: Expo SDK 51 ✅
 
-The project currently uses Expo SDK 49, which targets Android API level 33.
+The project uses Expo SDK 51, which targets Android API level 34.
 
 ### Google Play Store Requirement
 
-**Important:** As of August 31, 2024, Google Play Store requires apps to target Android API level 34 or higher.
+**Status:** ✅ **Ready for Play Store submission!**
 
-- **Current status:** SDK 49 targets API 33 (not compatible with Play Store submission)
-- **Required for Play Store:** Upgrade to Expo SDK 50 or later
-- **APK sideloading:** Works fine with current SDK
+As of August 31, 2024, Google Play Store requires apps to target Android API level 34 or higher.
 
-### When to Upgrade
+- **Current status:** SDK 51 targets API 34+ ✅ (compatible with Play Store submission)
+- **Upgraded from:** SDK 49 (API 33)
+- **APK sideloading:** Works perfectly
 
-You should upgrade to SDK 50+ if:
-- ✅ You plan to publish to Google Play Store
-- ✅ You want the latest Android features and security updates
-- ✅ You need compatibility with newer Android versions
+### Upgrade History
 
-You can delay upgrading if:
-- ⏸️ You only distribute APKs via direct download (sideloading)
-- ⏸️ You're not ready to test with the new SDK
-- ⏸️ Your dependencies aren't compatible with SDK 50 yet
+**November 2024:** Upgraded from SDK 49 to SDK 51
+- **Reason:** Prepare for Google Play Store submission (requires API 34+)
+- **Process:** Used `--legacy-peer-deps` to resolve webpack-config peer dependency conflicts
+- **Breaking changes:** Updated React Native from 0.72.10 to 0.74.5, expo-router from 2.x to 3.x
+- **Testing:** All expo-doctor checks pass (16/16)
 
-### How to Upgrade to SDK 50+
+### Current Configuration
 
-When you're ready to upgrade:
+The project is configured for SDK 51:
+- Android: API level 34+ ✅
+- React Native: 0.74.5
+- Expo: ~51.0.0
+- Expo Router: ~3.5.24
+
+### Future Upgrades
+
+To upgrade to future SDK versions:
 
 ```bash
 # Upgrade to latest Expo SDK
-npx expo install expo@latest
+npm install expo@~52.0.0 --legacy-peer-deps
 
 # Update all dependencies to match new SDK
-npx expo install --fix
+npm install --legacy-peer-deps [package list from expo install --fix output]
 
-# Update EAS Build configuration if needed
+# Verify everything is compatible
 npx expo-doctor
 
 # Test the app thoroughly
 npm start
 ```
 
-**Important:** Major SDK upgrades can introduce breaking changes. Test thoroughly after upgrading.
-
-### Current Configuration
-
-The project is configured for SDK 49:
-- Android: API level 33
-- React Native: 0.72.10
-- Expo: ~49.0.18
+**Note:** Use `--legacy-peer-deps` if you encounter peer dependency conflicts with @expo/webpack-config.
 
 ### Links
 
