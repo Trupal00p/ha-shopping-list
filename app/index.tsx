@@ -31,7 +31,27 @@ export default function Wrapper() {
           ),
         }}
       />
-      <ErrorBoundary fallback={<Text>Something went wrong</Text>}>
+      <ErrorBoundary
+        fallbackRender={({ error, resetErrorBoundary }) => (
+          <View style={{ padding: 20 }}>
+            <Text style={{ color: 'red', marginBottom: 10, fontSize: 16, fontWeight: 'bold' }}>
+              Something went wrong
+            </Text>
+            <Text style={{ marginBottom: 10 }}>
+              {error?.message || 'Unknown error'}
+            </Text>
+            <Text style={{ fontSize: 12, color: '#666', marginBottom: 20 }}>
+              {error?.stack}
+            </Text>
+            <Text
+              style={{ color: theme.colors.primary, textDecorationLine: 'underline' }}
+              onPress={resetErrorBoundary}
+            >
+              Try again
+            </Text>
+          </View>
+        )}
+      >
         <ShoppingListView
           onClearCompletedChange={(fn) => setClearCompletedFn(() => fn)}
           onHasCompletedItemsChange={setHasCompletedItems}
