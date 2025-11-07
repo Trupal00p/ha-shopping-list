@@ -18,6 +18,15 @@ export default function Wrapper() {
     }
   }, [clearCompletedFn]);
 
+  // Memoize callbacks to prevent infinite re-renders
+  const handleClearCompletedChange = useCallback((fn: () => void) => {
+    setClearCompletedFn(() => fn);
+  }, []);
+
+  const handleHasCompletedItemsChange = useCallback((hasItems: boolean) => {
+    setHasCompletedItems(hasItems);
+  }, []);
+
   return (
     <View style={{ backgroundColor: theme.colors.background, height: "100%" }}>
       <Stack.Screen
@@ -53,8 +62,8 @@ export default function Wrapper() {
         )}
       >
         <ShoppingListView
-          onClearCompletedChange={(fn) => setClearCompletedFn(() => fn)}
-          onHasCompletedItemsChange={setHasCompletedItems}
+          onClearCompletedChange={handleClearCompletedChange}
+          onHasCompletedItemsChange={handleHasCompletedItemsChange}
         />
       </ErrorBoundary>
     </View>
