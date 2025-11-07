@@ -8,6 +8,7 @@ import { PaperProvider, Text, useTheme } from "react-native-paper";
 import { SettingsProvider } from "../components/SettingContext";
 import { SnackProvider } from "../components/SnackContext";
 import { ErrorBoundary } from "react-error-boundary";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -48,17 +49,19 @@ const ConfiguredStack = () => {
 
 export default function Layout() {
   return (
-    <PersistQueryClientProvider
-      client={queryClient}
-      persistOptions={{ persister }}
-    >
-      <PaperProvider theme={{ dark: false }}>
-        <SettingsProvider>
-          <SnackProvider>
-            <ConfiguredStack />
-          </SnackProvider>
-        </SettingsProvider>
-      </PaperProvider>
-    </PersistQueryClientProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <PersistQueryClientProvider
+        client={queryClient}
+        persistOptions={{ persister }}
+      >
+        <PaperProvider theme={{ dark: false }}>
+          <SettingsProvider>
+            <SnackProvider>
+              <ConfiguredStack />
+            </SnackProvider>
+          </SettingsProvider>
+        </PaperProvider>
+      </PersistQueryClientProvider>
+    </GestureHandlerRootView>
   );
 }
