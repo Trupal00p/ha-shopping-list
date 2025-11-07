@@ -2,28 +2,23 @@ import { RefreshControl, View } from "react-native";
 import { ScrollView } from "react-native-gesture-handler";
 import {
   ActivityIndicator,
-  Button,
   List,
   Text,
   useTheme,
 } from "react-native-paper";
 import { TodoItem } from "../types";
 import { AddItemInput } from "./AddItemInput";
-import { useTodoMutations } from "../hooks/useTodoMutations";
-import { useTodoItems } from "../hooks/useTodoItems";
-import { useNetworkStatus } from "../hooks/useNetworkStatus";
 import { SyncStatusBadge } from "./SyncStatusBadge";
-import { useSettings } from "./SettingContext";
-import { useMemo, useState, useEffect, useCallback } from "react";
+import { useMemo, useState, useEffect } from "react";
 
 interface ShoppingListViewProps {
-  onClearCompletedChange?: (fn: () => void) => void;
-  onHasCompletedItemsChange?: (hasItems: boolean) => void;
+  todoQuery: ReturnType<typeof import("../hooks/useTodoItems").useTodoItems>;
+  mutations: ReturnType<typeof import("../hooks/useTodoMutations").useTodoMutations>;
+  isOnline: boolean;
 }
 
-export function ShoppingListView({ onClearCompletedChange, onHasCompletedItemsChange }: ShoppingListViewProps = {}) {
+export function ShoppingListView({ todoQuery, mutations, isOnline }: ShoppingListViewProps) {
   const theme = useTheme();
-  const { settings } = useSettings();
 
   const {
     isLoading,
@@ -36,29 +31,9 @@ export function ShoppingListView({ onClearCompletedChange, onHasCompletedItemsCh
     refetch,
     isRefetching,
     data,
-  } = useTodoItems(settings.selectedList);
+  } = todoQuery;
 
-  const { addNew, toggle, clearCompleted } = useTodoMutations(settings.selectedList);
-  const { isOnline } = useNetworkStatus();
-
-  // Create stable clear completed function
-  const handleClearCompleted = useCallback(() => {
-    clearCompleted.mutate(completed || []);
-  }, [clearCompleted, completed]);
-
-  // Notify parent of clear completed function
-  useEffect(() => {
-    if (onClearCompletedChange) {
-      onClearCompletedChange(handleClearCompleted);
-    }
-  }, [onClearCompletedChange, handleClearCompleted]);
-
-  // Notify parent of completed items status
-  useEffect(() => {
-    if (onHasCompletedItemsChange) {
-      onHasCompletedItemsChange((completed && completed.length > 0) || false);
-    }
-  }, [onHasCompletedItemsChange, completed]);
+  const { addNew, toggle } = mutations;
 
   // Track if disconnected long enough to show message
   const [showDisconnected, setShowDisconnected] = useState(false);

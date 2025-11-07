@@ -5,27 +5,33 @@ import { Text, useTheme } from "react-native-paper";
 import { ShoppingListView } from "../components/ShoppingList";
 import { ListPicker } from "../components/ListPicker";
 import { HeaderMenu } from "../components/HeaderMenu";
-import { useState, useCallback } from "react";
+import { useCallback, useMemo } from "react";
+import { useSettings } from "../components/SettingContext";
+import { useTodoItems } from "../hooks/useTodoItems";
+import { useTodoMutations } from "../hooks/useTodoMutations";
+import { useNetworkStatus } from "../hooks/useNetworkStatus";
 
 export default function Wrapper() {
   const theme = useTheme();
-  const [clearCompletedFn, setClearCompletedFn] = useState<(() => void) | null>(null);
-  const [hasCompletedItems, setHasCompletedItems] = useState(false);
+  const { settings } = useSettings();
 
+  // Fetch data and mutations at the top level
+  const todoQuery = useTodoItems(settings.selectedList);
+  const mutations = useTodoMutations(settings.selectedList);
+  const { isOnline } = useNetworkStatus();
+
+  // Derive state from data
+  const hasCompletedItems = useMemo(
+    () => (todoQuery.completed?.length ?? 0) > 0,
+    [todoQuery.completed]
+  );
+
+  // Clear completed handler
   const handleClearCompleted = useCallback(() => {
-    if (clearCompletedFn) {
-      clearCompletedFn();
+    if (todoQuery.completed) {
+      mutations.clearCompleted.mutate(todoQuery.completed);
     }
-  }, [clearCompletedFn]);
-
-  // Memoize callbacks to prevent infinite re-renders
-  const handleClearCompletedChange = useCallback((fn: () => void) => {
-    setClearCompletedFn(() => fn);
-  }, []);
-
-  const handleHasCompletedItemsChange = useCallback((hasItems: boolean) => {
-    setHasCompletedItems(hasItems);
-  }, []);
+  }, [todoQuery.completed, mutations.clearCompleted]);
 
   return (
     <View style={{ backgroundColor: theme.colors.background, height: "100%" }}>
@@ -62,8 +68,9 @@ export default function Wrapper() {
         )}
       >
         <ShoppingListView
-          onClearCompletedChange={handleClearCompletedChange}
-          onHasCompletedItemsChange={handleHasCompletedItemsChange}
+          todoQuery={todoQuery}
+          mutations={mutations}
+          isOnline={isOnline}
         />
       </ErrorBoundary>
     </View>
