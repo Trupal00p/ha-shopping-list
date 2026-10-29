@@ -1,33 +1,41 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useState } from "react";
+import {
+  useMutationState,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { AppState } from "react-native";
 import { useSnack } from "../components/SnackContext";
 import isValidHostname from "is-valid-hostname";
 import ky from "ky";
 import { useSettings } from "../components/SettingContext";
-import { TodoList, TodoItem } from "../types";
+import { TodoList } from "../types";
+import {
+  TODO_CHANGE_KEY,
+  TodoChange,
+  applyPendingChanges,
+  todoItemsKey,
+} from "../lib/todoChanges";
+import { useNetworkStatus } from "./useNetworkStatus";
 
-interface TodoEntityState {
-  entity_id: string;
-  state: string;
-  attributes: {
-    items?: TodoItem[];
-  };
-}
+const SUBSCRIPTION_ID = 1;
 
 export const useTodoItems = (entityId?: string) => {
   const queryClient = useQueryClient();
   const setSnackText = useSnack();
+  const { isOnline } = useNetworkStatus();
 
   const { settings, requestOptions } = useSettings();
   const { apiKey, host, useTls } = settings;
 
   // Strip port for hostname validation
   const hostWithoutPort = host?.split(":")[0] || "";
+  const enabled =
+    !!apiKey && !!host && !!entityId && isValidHostname(hostWithoutPort);
 
   const query = useQuery<TodoList>({
-    queryKey: ["todo_items", entityId],
-    enabled: !!apiKey && !!host && !!entityId && isValidHostname(hostWithoutPort),
-    retry: false,
+    queryKey: todoItemsKey(entityId),
+    enabled,
     queryFn: async () => {
       // Call the todo.get_items service to fetch items
       const response = (await ky
@@ -40,120 +48,153 @@ export const useTodoItems = (entityId?: string) => {
         .json()) as any;
 
       // The service returns items in service_response[entity_id].items
-      if (
-        response &&
-        response.service_response &&
-        entityId &&
-        response.service_response[entityId] &&
-        response.service_response[entityId].items
-      ) {
-        return response.service_response[entityId].items;
-      }
-
-      return [];
+      return (entityId && response?.service_response?.[entityId]?.items) || [];
     },
   });
 
-  const [wsCount, setWsCount] = useState(0);
+  // Changes made on this device that Home Assistant hasn't confirmed yet
+  const allPending = useMutationState({
+    filters: { mutationKey: TODO_CHANGE_KEY, status: "pending" },
+    select: (mutation) => ({
+      change: mutation.state.variables as TodoChange,
+      waiting: mutation.state.isPaused || mutation.state.failureCount > 0,
+    }),
+  });
+
+  const pending = useMemo(
+    () => allPending.filter(({ change }) => change.entityId === entityId),
+    [allPending, entityId]
+  );
+  const pendingChanges = useMemo(
+    () => pending.map(({ change }) => change),
+    [pending]
+  );
+  const isWaitingToSync = pending.some(({ waiting }) => waiting);
+
+  const items = useMemo(
+    () => applyPendingChanges(query.data || [], pendingChanges),
+    [query.data, pendingChanges]
+  );
+
+  const { completed, todo } = useMemo(
+    () => ({
+      completed: items.filter((item) => item.status === "completed"),
+      todo: items.filter((item) => item.status !== "completed"),
+    }),
+    [items]
+  );
+
+  const [wsConnected, setWsConnected] = useState(false);
   const [effectKey, setEffectKey] = useState(false);
 
+  // Live updates via Home Assistant's todo item subscription, which pushes
+  // just this list's items instead of every state change in the house
   useEffect(() => {
-    if (apiKey && host && entityId && isValidHostname(hostWithoutPort)) {
-      try {
-        const ws = new WebSocket(
-          `ws${useTls ? "s" : ""}://${host}/api/websocket`
-        );
-        const subscriptionId = Math.floor(Math.random() * 100000);
-        let isConnected = false;
-
-        setWsCount((c) => c + 1);
-
-        ws.addEventListener("error", (errorEvent) => {
-          setWsCount((c) => c - 1);
-        });
-
-        ws.addEventListener("close", (errorEvent) => {
-          setWsCount((c) => c - 1);
-        });
-
-        const listener = (event: MessageEvent) => {
-          const message = JSON.parse(event.data);
-          switch (message.type) {
-            case "auth_required":
-              ws.send(
-                JSON.stringify({
-                  type: "auth",
-                  access_token: apiKey,
-                })
-              );
-              break;
-            case "auth_ok":
-              isConnected = true;
-              // Subscribe to state_changed events for this specific entity
-              ws.send(
-                JSON.stringify({
-                  type: "subscribe_events",
-                  event_type: "state_changed",
-                  id: subscriptionId,
-                })
-              );
-              // Invalidate on successful connection to ensure sync
-              queryClient.invalidateQueries({
-                queryKey: ["todo_items", entityId],
-              });
-              break;
-            case "auth_invalid":
-              setSnackText("WebSocket Authentication Failed");
-              ws.close();
-              break;
-            case "event":
-              if (message.event.event_type === "state_changed") {
-                // Check if this state change is for our todo entity
-                if (message.event.data.entity_id === entityId) {
-                  queryClient.invalidateQueries({
-                    queryKey: ["todo_items", entityId],
-                  });
-                }
-              }
-              break;
-            default:
-              break;
-          }
-        };
-
-        ws.addEventListener("message", listener);
-
-        return () => {
-          ws.close();
-        };
-      } catch (e) {
-        // WebSocket connection failed
-      }
+    if (!enabled || !isOnline) {
+      return;
     }
+
+    let ws: WebSocket | undefined;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    let attempts = 0;
+    let stopped = false;
+
+    const connect = () => {
+      clearTimeout(retryTimer);
+      const socket = new WebSocket(
+        `ws${useTls ? "s" : ""}://${host}/api/websocket`
+      );
+      ws = socket;
+
+      socket.onmessage = (event: MessageEvent) => {
+        const message = JSON.parse(event.data);
+        switch (message.type) {
+          case "auth_required":
+            socket.send(JSON.stringify({ type: "auth", access_token: apiKey }));
+            break;
+          case "auth_ok":
+            attempts = 0;
+            setWsConnected(true);
+            socket.send(
+              JSON.stringify({
+                id: SUBSCRIPTION_ID,
+                type: "todo/item/subscribe",
+                entity_id: entityId,
+              })
+            );
+            break;
+          case "auth_invalid":
+            stopped = true;
+            setSnackText("WebSocket Authentication Failed");
+            socket.close();
+            break;
+          case "result":
+            // Subscription unsupported; at least sync once
+            if (message.id === SUBSCRIPTION_ID && !message.success) {
+              queryClient.invalidateQueries({
+                queryKey: todoItemsKey(entityId),
+              });
+            }
+            break;
+          case "event":
+            if (Array.isArray(message.event?.items)) {
+              queryClient.setQueryData(
+                todoItemsKey(entityId),
+                message.event.items
+              );
+            }
+            break;
+          default:
+            break;
+        }
+      };
+
+      socket.onclose = () => {
+        if (ws !== socket) return;
+        setWsConnected(false);
+        if (!stopped) {
+          retryTimer = setTimeout(
+            connect,
+            Math.min(1000 * 2 ** attempts++, 60000)
+          );
+        }
+      };
+    };
+
+    // Android drops sockets in the background; reconnect straight away when
+    // the app comes back rather than waiting out the backoff
+    const appState = AppState.addEventListener("change", (status) => {
+      if (
+        status === "active" &&
+        !stopped &&
+        ws?.readyState !== WebSocket.OPEN &&
+        ws?.readyState !== WebSocket.CONNECTING
+      ) {
+        attempts = 0;
+        connect();
+      }
+    });
+
+    connect();
+
+    return () => {
+      stopped = true;
+      clearTimeout(retryTimer);
+      appState.remove();
+      ws?.close();
+      setWsConnected(false);
+    };
   }, [
-    settings,
-    queryClient,
-    setWsCount,
+    enabled,
+    isOnline,
     effectKey,
-    setSnackText,
-    hostWithoutPort,
     apiKey,
     host,
+    useTls,
     entityId,
+    queryClient,
+    setSnackText,
   ]);
-
-  const { completed, todo } =
-    (query.data || []).reduce(
-      (acc: { completed: TodoList; todo: TodoList }, item) => {
-        if (item.status === "completed") {
-          acc.completed.push(item);
-        } else {
-          acc.todo.push(item);
-        }
-        return acc;
-      },
-      { completed: [], todo: [] }
-    ) || { completed: [], todo: [] };
 
   const reconnectWs = useCallback(() => {
     setEffectKey((c) => !c);
@@ -161,9 +202,12 @@ export const useTodoItems = (entityId?: string) => {
 
   return {
     ...query,
+    items,
     completed,
     todo,
-    wsConnected: wsCount > 0,
+    pendingCount: pendingChanges.length,
+    isWaitingToSync,
+    wsConnected,
     reconnectWs,
   };
 };

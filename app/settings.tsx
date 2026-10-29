@@ -1,7 +1,7 @@
 import { Stack, router } from "expo-router";
 import { useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
-import { Checkbox, FAB, TextInput, useTheme, Text } from "react-native-paper";
+import { Checkbox, FAB, TextInput, useTheme } from "react-native-paper";
 import { useSettings } from "../components/SettingContext";
 
 const styles = StyleSheet.create({
@@ -29,7 +29,7 @@ export default function Details() {
     }
   }, [settings, setApiKey, setHost]);
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   // save values
   const save = () => {
@@ -55,30 +55,40 @@ export default function Details() {
         <TextInput
           mode="outlined"
           label="Host"
+          placeholder="homeassistant.local:8123"
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="url"
           value={host}
           onChangeText={(text) => setHost(text)}
         />
         <TextInput
           mode="outlined"
-          label="API Key"
+          label="Long-Lived Access Token"
+          autoCapitalize="none"
+          autoCorrect={false}
+          secureTextEntry
           value={apiKey}
           onChangeText={(text) => setApiKey(text)}
+          style={{ marginTop: 12 }}
         />
-        <Text>
-          Use TLS:{" "}
-          <Checkbox
-            status={useTls ? "checked" : "unchecked"}
-            onPress={() => {
-              setUseTls((tls) => !tls);
-            }}
-          />
-        </Text>
+        <Checkbox.Item
+          label="Use HTTPS (TLS)"
+          status={useTls ? "checked" : "unchecked"}
+          onPress={() => {
+            setUseTls((tls) => !tls);
+          }}
+          position="leading"
+          style={{ paddingHorizontal: 0 }}
+        />
 
         <View style={{ height: 200 }} />
         <FAB
           icon="content-save"
           label="Save"
           style={styles.fab}
+          loading={loading}
+          disabled={loading || !host.trim() || !apiKey.trim()}
           onPress={save}
         />
       </View>

@@ -5,7 +5,7 @@ import { Text, useTheme } from "react-native-paper";
 import { ShoppingListView } from "../components/ShoppingList";
 import { ListPicker } from "../components/ListPicker";
 import { HeaderMenu } from "../components/HeaderMenu";
-import { useCallback, useMemo } from "react";
+import { useCallback } from "react";
 import { useSettings } from "../components/SettingContext";
 import { useTodoItems } from "../hooks/useTodoItems";
 import { useTodoMutations } from "../hooks/useTodoMutations";
@@ -21,16 +21,11 @@ export default function Wrapper() {
   const { isOnline } = useNetworkStatus();
 
   // Derive state from data
-  const hasCompletedItems = useMemo(
-    () => (todoQuery.completed?.length ?? 0) > 0,
-    [todoQuery.completed]
-  );
+  const hasCompletedItems = todoQuery.completed.length > 0;
 
   // Clear completed handler
   const handleClearCompleted = useCallback(() => {
-    if (todoQuery.completed) {
-      mutations.clearCompleted.mutate(todoQuery.completed);
-    }
+    mutations.clearCompleted(todoQuery.completed);
   }, [todoQuery.completed, mutations.clearCompleted]);
 
   return (

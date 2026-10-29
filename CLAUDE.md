@@ -59,13 +59,15 @@ The app implements a true offline-first architecture using React Query persisten
 2. **Persistent Cache** (`app/_layout.tsx`):
    - React Query cache persisted to AsyncStorage
    - Todo list data rehydrated on app launch
-   - 24-hour cache lifetime, 5-minute stale time
+   - 30-day cache lifetime, 5-minute stale time
+   - Last good list is persisted even if the latest refetch failed
+   - Pending changes are persisted too and resumed on launch (`resumeQueuedChanges`)
    - App works offline immediately after first load
 
-3. **Network Detection** (`hooks/useNetworkStatus.ts`):
-   - Integrates NetInfo with React Query's online manager
-   - Automatically pauses queries when offline
-   - Provides real-time network status to UI
+3. **Network Detection** (`app/_layout.tsx`, `hooks/useNetworkStatus.ts`):
+   - NetInfo drives React Query's `onlineManager` (connected with no internet counts as offline)
+   - AppState drives `focusManager` (refetch on foreground, retries pause in background)
+   - `useNetworkStatus` reads `onlineManager` for the UI
 
 4. **List Discovery** (`hooks/useTodoLists.ts`):
    - Fetches all todo.* entities from Home Assistant
@@ -74,22 +76,20 @@ The app implements a true offline-first architecture using React Query persisten
    - 5-minute cache for list metadata
 
 5. **Real-time Synchronization** (`hooks/useTodoItems.ts`):
-   - Fetches todo entity state via REST API (`/api/states/{entity_id}`)
-   - Items stored in entity attributes
-   - Establishes WebSocket connection to Home Assistant
-   - Subscribes to `state_changed` events with randomized ID
-   - Filters for selected entity_id changes
-   - Invalidates React Query cache on connection and when events received
+   - Fetches items via the `todo.get_items` service (`return_response=true`)
+   - Overlays pending changes from the mutation cache (`useMutationState`) on the server list
+   - WebSocket `todo/item/subscribe` pushes this list's items straight into the cache
+   - Reconnects with backoff, when back online, and when the app returns to foreground
    - Handles authentication failures gracefully
 
-6. **Offline-First Mutations** (`hooks/useTodoMutations.ts`):
-   - Uses Home Assistant services API (todo.add_item, todo.update_item, todo.remove_item)
-   - `networkMode: 'offlineFirst'` enables automatic queueing
-   - Immediately updates local state with `_pending` flag
-   - Queues mutations when offline, auto-syncs when online
-   - 3 retry attempts with exponential backoff
-   - Distinguishes between offline and actual failures
-   - Adds timestamps for conflict resolution
+6. **Offline-First Changes** (`lib/todoChanges.ts`, `hooks/useTodoMutations.ts`):
+   - Every edit is a `TodoChange` (`add` / `setStatus` / `remove`) sent as a `["todo_change"]` mutation
+   - `mutationFn`, retry and `onSuccess` live in `setMutationDefaults`, registered before cache restore so persisted changes can replay after a restart
+   - `mutationFn` loads settings from storage itself (`loadRequestOptions`) since it may run before `SettingsProvider` loads
+   - A single mutation `scope` sends changes to Home Assistant in order
+   - Network errors, timeouts and 408/429/502/503/504 retry indefinitely (bad signal); other errors give up after 3 retries
+   - Nothing is rolled back by hand: a failed change leaves the pending overlay, so the list reverts on its own
+   - Items added offline have a `temp-` uid and are referenced by summary until synced
 
 7. **State Management**: React Query handles caching, persistence, and synchronization. No Redux store needed.
 
@@ -97,17 +97,17 @@ The app implements a true offline-first architecture using React Query persisten
 
 - **SettingsProvider** (`components/SettingContext.tsx`): Provides settings and HTTP request configuration throughout the app. Manages selected list state. Auto-redirects to settings page if credentials missing. Includes `setSelectedList()` helper.
 
-- **useNetworkStatus** (`hooks/useNetworkStatus.ts`): Monitors network connectivity using NetInfo. Integrates with React Query's online manager to automatically pause/resume operations. Provides `isOnline` and `isConnected` state.
+- **useNetworkStatus** (`hooks/useNetworkStatus.ts`): Subscribes to React Query's `onlineManager` (wired to NetInfo in `app/_layout.tsx`). Provides `isOnline`.
 
 - **useTodoLists** (`hooks/useTodoLists.ts`): Fetches all todo entities from `/api/states`. Filters for `todo.*` entities. Returns array of `{id, name, entity_id}` sorted by name.
 
-- **useTodoItems** (`hooks/useTodoItems.ts`): Custom hook that fetches items for a specific todo entity. Combines REST API data fetching (`/api/states/{entity_id}`) with WebSocket state_changed subscription. Splits items into `todo` and `completed` arrays based on status. Tracks WebSocket connection status. Returns raw `data` array for pending change tracking.
+- **useTodoItems** (`hooks/useTodoItems.ts`): Fetches items for a todo entity and keeps them live over WebSocket. Returns server `data`, the overlaid `items` split into `todo` and `completed`, `pendingCount`, `isWaitingToSync` (a pending change is paused or failing) and `wsConnected`.
 
-- **useTodoMutations** (`hooks/useTodoMutations.ts`): Provides three offline-first mutations using HA services API:
-  - `toggle`: Call todo.update_item to change status (adds `_pending` and `_timestamp` flags)
-  - `addNew`: Call todo.add_item to create item (uses temporary uid until synced)
-  - `clearCompleted`: Call todo.remove_item for all completed items
-  - All mutations queue when offline and auto-sync with 3 retries
+- **useTodoMutations** (`hooks/useTodoMutations.ts`): Returns plain functions that queue a `TodoChange`:
+  - `toggle(item)`: todo.update_item with the opposite status
+  - `add(summary)`: todo.add_item (temporary uid until synced)
+  - `clearCompleted(items)`: todo.remove_item for all completed items
+  - Shows a snackbar when a change is finally rejected
 
 - **ListPicker** (`components/ListPicker.tsx`): Dropdown menu for selecting active todo list. Shows friendly names, checkmark on selected list. Auto-selects first list if none chosen.
 
@@ -122,19 +122,18 @@ The app implements a true offline-first architecture using React Query persisten
 
 ### WebSocket Connection
 
-The WebSocket connection (`hooks/useTodoItems.ts:48-135`) follows Home Assistant's WebSocket API protocol:
+The WebSocket connection (`hooks/useTodoItems.ts`) follows Home Assistant's WebSocket API protocol:
 
-1. Connects to `ws[s]://HOST/api/websocket`
+1. Connects to `ws[s]://HOST/api/websocket` (only while online)
 2. Waits for `auth_required` message
 3. Sends `auth` message with access token
-4. After `auth_ok`:
-   - Subscribes to `state_changed` events with randomized ID
-   - Filters for changes to the selected entity_id
-   - Invalidates cache to sync any offline changes
-5. Handles `auth_invalid` by closing connection and notifying user
-6. Invalidates React Query cache when selected todo entity changes
+4. After `auth_ok`, sends `todo/item/subscribe` for the selected entity
+5. Each `event` carries the full item list, written directly with `setQueryData` (the first one arrives immediately, syncing on connect)
+6. If the subscription is rejected, falls back to a single invalidate
+7. Handles `auth_invalid` by closing connection, notifying the user and not retrying
+8. On unexpected close, reconnects with exponential backoff (max 60s), or immediately when the app returns to foreground
 
-The connection automatically closes/reopens when settings or selected list change via the `effectKey` toggle mechanism. Error messages only shown if connection was previously established.
+The connection closes/reopens when settings, selected list or online state change, or via the `effectKey` toggle (pull-to-refresh).
 
 ### Navigation
 
@@ -149,7 +148,7 @@ Uses Expo Router with file-based routing:
 1. **Mobile**: Expo SecureStore (encrypted keychain/keystore)
 2. **Web fallback**: localStorage
 3. **Values**: API key, host, TLS setting, selected list entity ID
-4. **Trimming**: API key and host whitespace removed on save (`components/SettingContext.tsx:77-80`)
+4. **Trimming**: API key and host whitespace removed on save (`saveSettings` in `components/SettingContext.tsx`)
 
 **Todo List Data** is persisted via:
 1. **AsyncStorage**: React Query cache automatically saved
@@ -157,7 +156,7 @@ Uses Expo Router with file-based routing:
 3. **Cache keys**:
    - `todo_lists` for list metadata
    - `todo_items:{entity_id}` for each list's items
-4. **Retention**: 24-hour cache lifetime (gcTime)
+4. **Retention**: 30-day cache lifetime (gcTime and persister maxAge)
 5. **Rehydration**: Automatic on app launch via PersistQueryClientProvider
 
 ## Important Implementation Notes
@@ -166,22 +165,19 @@ Uses Expo Router with file-based routing:
 - **True offline-first**: App works completely offline after initial data load
 - **Mutation queueing**: React Query automatically queues mutations when offline
 - **Auto-sync**: Queued mutations processed automatically when network restored
-- **Retry strategy**: 3 attempts with exponential backoff (1s, 2s, 4s, up to 30s max)
-- **Pending indicators**: `_pending` flag tracks unsynced changes, shown in UI
-- **Timestamps**: `_timestamp` field enables conflict resolution (Last Write Wins)
+- **Survives restarts**: pending changes are persisted and replayed in order on next launch
+- **Retry strategy**: transient errors retry forever with exponential backoff (max 30s); other errors 3 attempts
+- **Pending indicators**: the overlay sets `_pending` on affected items, shown in UI
+- **Persist buster**: bump `buster` in `app/_layout.tsx` when the persisted shape changes
 
 ### Data Flow
 - The app redirects to `/settings` on initial launch if credentials are missing
 - Pull-to-refresh triggers both REST refetch AND WebSocket reconnection
-- WebSocket uses randomized subscription ID for multiple connection support
-- All mutations implement optimistic updates with smart rollback:
-  - Rollback only on actual failure (not when offline)
-  - Show "Saved locally" message when offline
-  - Show "Failed To Save" only for real errors
+- Optimistic state comes from the pending-change overlay, so refetches and WebSocket pushes can't clobber unsynced changes
+- A refetch error with cached data shows a status message instead of replacing the list
 
 ### UI Behavior
-- Connection status shown only when WebSocket disconnected AND device is online
-- Sync status banner shown when offline or when pending changes exist
+- Status pill priority: offline → weak connection (changes retrying) → syncing → refetch failed → reconnecting (WebSocket down 2s+ while online)
 - Per-item sync badges shown on items with unsaved changes
 - Network state integrated with React Query's online manager for automatic query pausing
 
@@ -190,16 +186,13 @@ Uses Expo Router with file-based routing:
   - `uid`: unique identifier
   - `summary`: item text
   - `status`: "needs_action" or "completed"
-  - `_pending` and `_timestamp`: local-only fields
-- Legacy `ShoppingItem` type kept for reference but not used
-- Local-only fields not sent to server
-- Server responses don't include local fields, cleared by invalidation
+  - `_pending`: display-only, set by the overlay; never stored in the server cache
 
 ### Home Assistant API
 - **Todo Lists**: Discovered via `/api/states`, filtered for `todo.*` entities
-- **Todo Items**: Fetched from `/api/states/{entity_id}`, items in `attributes.items`
+- **Todo Items**: `todo.get_items` service with `return_response=true`, items in `service_response[entity_id].items`
 - **Mutations**: Use `/api/services/todo/{service}` with entity_id and parameters
   - `todo.add_item`: `{entity_id, item: summary}`
-  - `todo.update_item`: `{entity_id, item: uid, status: "completed" | "needs_action"}`
-  - `todo.remove_item`: `{entity_id, item: [uid1, uid2, ...]}`
-- **WebSocket**: Subscribe to `state_changed` events, filter by entity_id
+  - `todo.update_item`: `{entity_id, item: uid_or_summary, status: "completed" | "needs_action"}`
+  - `todo.remove_item`: `{entity_id, item: [uid_or_summary, ...]}`
+- **WebSocket**: `todo/item/subscribe` with `entity_id`

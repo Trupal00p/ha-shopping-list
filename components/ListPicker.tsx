@@ -43,10 +43,11 @@ export function ListPicker() {
     );
   }
 
-  if (isError || !lists || lists.length === 0) {
+  // Cached lists are still usable if a refresh failed
+  if (!lists || lists.length === 0) {
     return (
       <View style={{ padding: 10 }}>
-        <Text>No todo lists found</Text>
+        <Text>{isError ? "Can't load lists" : "No todo lists found"}</Text>
       </View>
     );
   }

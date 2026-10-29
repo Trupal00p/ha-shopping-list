@@ -48,6 +48,24 @@ const SettingsContext = createContext<SettingsContext>({
   requestOptions: {},
 });
 
+const buildRequestOptions = ({ host, useTls, apiKey }: SettingsState): Options => ({
+  prefixUrl: `${useTls ? "https" : "http"}://${host}/`,
+  retry: 1,
+  headers: {
+    authorization: `Bearer ${apiKey}`,
+  },
+});
+
+// For code that runs outside React, such as queued changes replayed before
+// the provider has loaded settings
+export const loadRequestOptions = async () => {
+  const [apiKey, host, useTls] = await loadSettings();
+  if (!apiKey || !host) {
+    throw new Error("Home Assistant is not configured");
+  }
+  return buildRequestOptions({ apiKey, host, useTls: useTls === "true" });
+};
+
 export const useSettings = () => {
   return useContext(SettingsContext);
 };
@@ -114,16 +132,7 @@ export const SettingsProvider = ({ children }: { children: any }) => {
     return saveSettings(newSettings);
   };
 
-  const requestOptions = useMemo(
-    () => ({
-      prefixUrl: `${settings.useTls ? "https" : "http"}://${settings.host}/`,
-      retry: 1,
-      headers: {
-        authorization: `Bearer ${settings.apiKey}`,
-      },
-    }),
-    [settings]
-  );
+  const requestOptions = useMemo(() => buildRequestOptions(settings), [settings]);
 
   return (
     <SettingsContext.Provider
