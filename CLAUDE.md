@@ -26,15 +26,15 @@ npm run ios
 
 # Build APK for Android (preview)
 task apk
-# or: eas build --platform android --local --profile preview --output ha-shopping.apk
+# or: eas build --platform android --profile preview --local
 
 # Build development APK
 task devbuild
 # or: eas build --platform android --local --profile development --output ha-shopping.apk
 
-# Install APK on device
+# Install the newest APK in the project root on device
 task install
-# or: adb install ha-shopping.apk
+# or: adb install <file>.apk
 
 # List connected devices
 task devices

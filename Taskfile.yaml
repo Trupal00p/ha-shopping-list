@@ -17,9 +17,10 @@ tasks:
     cmds:
       - eas build --platform android --local --profile development --output ha-shopping.apk
   
+  # Installs the newest APK; eas names local builds build-<timestamp>.apk
   install:
     cmds:
-      - adb install ha-shopping.apk
+      - adb install "$(ls -t *.apk | head -n 1)"
 
   devices:
     cmds:
