@@ -11,7 +11,7 @@ tasks:
 
   apk:
     cmds:
-      - eas build --platform android --local --profile preview --output ha-shopping.apk
+      - eas build --platform android --profile preview --local
   
   devbuild:
     cmds:

@@ -55,6 +55,7 @@ export function ListPicker() {
   return (
     <Menu
       visible={visible}
+      anchorPosition="bottom"
       onDismiss={closeMenu}
       anchor={
         <Button

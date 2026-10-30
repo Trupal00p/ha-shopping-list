@@ -41,6 +41,7 @@ export function HeaderMenu({ onClearCompleted, hasCompletedItems }: HeaderMenuPr
   return (
     <Menu
       visible={visible}
+      anchorPosition="bottom"
       onDismiss={closeMenu}
       anchor={
         <IconButton
