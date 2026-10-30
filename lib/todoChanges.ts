@@ -1,5 +1,5 @@
 import { QueryClient } from "@tanstack/react-query";
-import ky, { HTTPError, TimeoutError } from "ky";
+import ky, { HTTPError, Options, TimeoutError } from "ky";
 import { loadRequestOptions } from "../components/SettingContext";
 import { TodoItem, TodoList } from "../types";
 
@@ -83,12 +83,23 @@ export function applyChange(
 export const applyPendingChanges = (items: TodoList, changes: TodoChange[]) =>
   changes.reduce((acc, change) => applyChange(acc, change, true), items);
 
+class NetworkError extends Error {}
+
+// fetch only rejects when no response arrived. React Native's fetch rejects
+// with TypeError but Expo's (the global since SDK 56) with its own FetchError,
+// so normalize both.
+const fetchOrNetworkError: Options["fetch"] = (input, init) =>
+  // ky always passes a Request
+  fetch(input as Request, init).catch((error) => {
+    throw new NetworkError(error instanceof Error ? error.message : String(error));
+  });
+
 // Bad signal shows up as fetch failures and timeouts rather than as being
 // offline, so these are retried until they get through instead of discarded.
 const TRANSIENT_STATUSES = [408, 429, 502, 503, 504];
 
 export const isTransientError = (error: unknown) =>
-  error instanceof TypeError ||
+  error instanceof NetworkError ||
   error instanceof TimeoutError ||
   (error instanceof HTTPError &&
     TRANSIENT_STATUSES.includes(error.response.status));
@@ -110,6 +121,7 @@ async function sendChange(change: TodoChange, client: QueryClient) {
   const callService = (service: string, json: object) =>
     ky.post(`api/services/todo/${service}`, {
       ...requestOptions,
+      fetch: fetchOrNetworkError,
       json: { entity_id: change.entityId, ...json },
     });
 

@@ -86,7 +86,7 @@ The workflow will build and attach the APK to the specified release.
 
 The workflow performs these steps:
 1. **Checkout repository** - Downloads your code
-2. **Setup Node.js** - Installs Node.js 20
+2. **Setup Node.js** - Installs the Node.js version in `.nvmrc` (22)
 3. **Setup EAS** - Installs EAS CLI and authenticates
 4. **Install dependencies** - Runs `npm ci`
 5. **Build Android APK** - Uses EAS Build (takes 10-15 minutes)
@@ -147,8 +147,8 @@ The workflow performs these steps:
 **Problem:** Incompatible Node version errors
 
 **Solution:**
-- The workflow uses Node.js 20, which is compatible with modern packages
-- If you see version errors, check that your dependencies support Node 20
+- Expo SDK 58 requires Node.js 22.13+ (or 24.3+); the workflow reads `.nvmrc`
+- Locally, run `nvm use` in the project directory before building
 - Update dependencies if needed: `npm update`
 
 ## Testing Locally Before Release

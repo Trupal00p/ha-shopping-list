@@ -2,6 +2,7 @@ import { Stack, router } from "expo-router";
 import { useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { Checkbox, FAB, TextInput, useTheme } from "react-native-paper";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSettings } from "../components/SettingContext";
 
 const styles = StyleSheet.create({
@@ -15,6 +16,7 @@ const styles = StyleSheet.create({
 
 export default function Details() {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const { settings, saveSettings } = useSettings();
 
   const [apiKey, setApiKey] = useState("");
@@ -86,7 +88,8 @@ export default function Details() {
         <FAB
           icon="content-save"
           label="Save"
-          style={styles.fab}
+          // Edge-to-edge: keep clear of the system navigation bar
+          style={[styles.fab, { marginBottom: 16 + insets.bottom }]}
           loading={loading}
           disabled={loading || !host.trim() || !apiKey.trim()}
           onPress={save}

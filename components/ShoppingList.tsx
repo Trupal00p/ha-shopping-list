@@ -12,6 +12,7 @@ import { TodoItem } from "../types";
 import { AddItemInput } from "./AddItemInput";
 import { SyncStatusBadge } from "./SyncStatusBadge";
 import { useMemo, useState, useEffect } from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 interface ShoppingListViewProps {
   todoQuery: ReturnType<typeof import("../hooks/useTodoItems").useTodoItems>;
@@ -57,6 +58,7 @@ function TodoRow({
 
 export function ShoppingListView({ todoQuery, mutations, isOnline }: ShoppingListViewProps) {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
 
   const {
     isLoading,
@@ -154,49 +156,9 @@ export function ShoppingListView({ todoQuery, mutations, isOnline }: ShoppingLis
 
 
   return (
-    <>
-      {/* Unified Status Bar */}
-      {statusMessage && (
-        <View
-          style={{
-            position: "absolute",
-            bottom: 80,
-            left: 10,
-            right: 10,
-            zIndex: 1000,
-            paddingVertical: 10,
-            paddingHorizontal: 14,
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 8,
-            backgroundColor: theme.colors.surfaceVariant,
-            borderRadius: 8,
-            elevation: 4,
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.25,
-            shadowRadius: 4,
-          }}
-        >
-          <Icon
-            source={statusMessage.icon}
-            size={18}
-            color={theme.colors.onSurfaceVariant}
-          />
-          <Text
-            style={{
-              flexShrink: 1,
-              color: theme.colors.onSurfaceVariant,
-              fontSize: 13,
-            }}
-          >
-            {statusMessage.text}
-          </Text>
-        </View>
-      )}
+    <View style={{ flex: 1 }}>
       <ScrollView
-        style={{ height: "100%" }}
+        style={{ flex: 1 }}
         keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl refreshing={isRefetching} onRefresh={onRefresh} />
@@ -230,18 +192,48 @@ export function ShoppingListView({ todoQuery, mutations, isOnline }: ShoppingLis
             ))}
           </List.Section>
         )}
-        <View style={{ height: 200 }}></View>
       </ScrollView>
+      {/* Edge-to-edge: keep the input clear of the system navigation bar */}
       <View
         style={{
-          position: "absolute",
-          bottom: 10,
-          left: 10,
-          right: 10,
+          paddingHorizontal: 10,
+          paddingTop: 8,
+          paddingBottom: 10 + insets.bottom,
+          gap: 8,
         }}
       >
+        {/* Unified Status Bar */}
+        {statusMessage && (
+          <View
+            style={{
+              paddingVertical: 10,
+              paddingHorizontal: 14,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+              backgroundColor: theme.colors.surfaceVariant,
+              borderRadius: 8,
+            }}
+          >
+            <Icon
+              source={statusMessage.icon}
+              size={18}
+              color={theme.colors.onSurfaceVariant}
+            />
+            <Text
+              style={{
+                flexShrink: 1,
+                color: theme.colors.onSurfaceVariant,
+                fontSize: 13,
+              }}
+            >
+              {statusMessage.text}
+            </Text>
+          </View>
+        )}
         <AddItemInput onAdd={add} />
       </View>
-    </>
+    </View>
   );
 }

@@ -5,6 +5,7 @@ import { Text, useTheme } from "react-native-paper";
 import { ShoppingListView } from "../components/ShoppingList";
 import { ListPicker } from "../components/ListPicker";
 import { HeaderMenu } from "../components/HeaderMenu";
+import { KeyboardAvoidingScreen } from "../components/KeyboardAvoidingScreen";
 import { useCallback } from "react";
 import { useSettings } from "../components/SettingContext";
 import { useTodoItems } from "../hooks/useTodoItems";
@@ -29,7 +30,7 @@ export default function Wrapper() {
   }, [todoQuery.completed, mutations.clearCompleted]);
 
   return (
-    <View style={{ backgroundColor: theme.colors.background, height: "100%" }}>
+    <KeyboardAvoidingScreen style={{ backgroundColor: theme.colors.background }}>
       <Stack.Screen
         options={{
           headerTitle: () => <ListPicker />,
@@ -68,7 +69,7 @@ export default function Wrapper() {
           isOnline={isOnline}
         />
       </ErrorBoundary>
-    </View>
+    </KeyboardAvoidingScreen>
   );
 }
 AppRegistry.registerComponent("Home Assistant Shopping List", () => Wrapper);
